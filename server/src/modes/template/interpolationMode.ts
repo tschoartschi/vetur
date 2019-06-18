@@ -20,8 +20,21 @@ import { createTemplateDiagnosticFilter } from '../../services/typescriptService
 
 export class VueInterpolationMode implements LanguageMode {
   private config: any = {};
+  private formatHost: ts.FormatDiagnosticsHost;
 
-  constructor(private tsModule: T_TypeScript, private serviceHost: IServiceHost) {}
+  constructor(private tsModule: T_TypeScript, private serviceHost: IServiceHost, workspacePath: string) {
+    this.formatHost = {
+      getCanonicalFileName(fileName: string) {
+        return fileName;
+      },
+      getCurrentDirectory() {
+        return workspacePath;
+      },
+      getNewLine() {
+        return '\n';
+      }
+    };
+  }
 
   getId() {
     return 'vue-html-interpolation';
@@ -66,6 +79,43 @@ export class VueInterpolationMode implements LanguageMode {
         range: mapBackRange(templateDoc, diag as ts.TextSpan, templateSourceMap),
         severity: DiagnosticSeverity.Error,
         message: ts.flattenDiagnosticMessageText(diag.messageText, '\n'),
+        code: diag.code,
+        source: 'Vetur'
+      };
+    });
+  }
+
+  doValidationForCli(document: TextDocument): Diagnostic[] {
+    if (!_.get(this.config, ['vetur', 'experimental', 'templateInterpolationService'], true)) {
+      return [];
+    }
+
+    // Add suffix to process this doc as vue template.
+    const templateDoc = TextDocument.create(
+      document.uri + '.template',
+      document.languageId,
+      document.version,
+      document.getText()
+    );
+
+    const { templateService, templateSourceMap } = this.serviceHost.updateCurrentVirtualVueTextDocument(templateDoc);
+    if (!languageServiceIncludesFile(templateService, templateDoc.uri)) {
+      return [];
+    }
+
+    const templateFileFsPath = getFileFsPath(templateDoc.uri);
+    // We don't need syntactic diagnostics because
+    // compiled template is always valid JavaScript syntax.
+    const rawTemplateDiagnostics = templateService.getSemanticDiagnostics(templateFileFsPath);
+    const templateDiagnosticFilter = createTemplateDiagnosticFilter(this.tsModule);
+
+    return rawTemplateDiagnostics.filter(templateDiagnosticFilter).map(diag => {
+      // syntactic/semantic diagnostic always has start and length
+      // so we can safely cast diag to TextSpan
+      return {
+        range: mapBackRange(templateDoc, diag as ts.TextSpan, templateSourceMap),
+        severity: DiagnosticSeverity.Error,
+        message: ts.formatDiagnosticsWithColorAndContext([diag], this.formatHost),
         code: diag.code,
         source: 'Vetur'
       };

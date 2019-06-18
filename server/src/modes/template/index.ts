@@ -23,7 +23,7 @@ export class VueHTMLMode implements LanguageMode {
     vueInfoService?: VueInfoService
   ) {
     this.htmlMode = new HTMLMode(documentRegions, workspacePath, vueInfoService);
-    this.vueInterpolationMode = new VueInterpolationMode(tsModule, serviceHost);
+    this.vueInterpolationMode = new VueInterpolationMode(tsModule, serviceHost, workspacePath!);
   }
   getId() {
     return 'vue-html';
@@ -37,6 +37,9 @@ export class VueHTMLMode implements LanguageMode {
   }
   doValidation(document: TextDocument) {
     return this.htmlMode.doValidation(document).concat(this.vueInterpolationMode.doValidation(document));
+  }
+  doValidationForCli(document: TextDocument) {
+    return this.vueInterpolationMode.doValidationForCli(document);
   }
   doComplete(document: TextDocument, position: Position) {
     return this.htmlMode.doComplete(document, position);

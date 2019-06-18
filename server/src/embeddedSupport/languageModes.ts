@@ -45,6 +45,7 @@ export interface LanguageMode {
   updateFileInfo?(doc: TextDocument): void;
 
   doValidation?(document: TextDocument): Diagnostic[];
+  doValidationForCli?(document: TextDocument): Diagnostic[];
   getCodeActions?(
     document: TextDocument,
     range: Range,

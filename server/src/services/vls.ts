@@ -155,7 +155,7 @@ export class VLS {
     this.lspConnection.onRequest('$/getDiagnostics', params => {
       const doc = this.documentService.getDocument(params.uri);
       if (doc) {
-        return this.doValidate(doc);
+        return this.doValidateForCli(doc);
       }
       return [];
     });
@@ -457,6 +457,20 @@ export class VLS {
     if (doc.languageId === 'vue') {
       this.languageModes.getAllLanguageModeRangesInDocument(doc).forEach(lmr => {
         if (lmr.mode.doValidation && this.validation[lmr.mode.getId()]) {
+          pushAll(diagnostics, lmr.mode.doValidation(doc));
+        }
+      });
+    }
+    return diagnostics;
+  }
+
+  doValidateForCli(doc: TextDocument): Diagnostic[] {
+    const diagnostics: Diagnostic[] = [];
+    if (doc.languageId === 'vue') {
+      this.languageModes.getAllLanguageModeRangesInDocument(doc).forEach(lmr => {
+        if (lmr.mode.doValidationForCli && this.validation[lmr.mode.getId()]) {
+          pushAll(diagnostics, lmr.mode.doValidationForCli(doc));
+        } else if (lmr.mode.doValidation && this.validation[lmr.mode.getId()]) {
           pushAll(diagnostics, lmr.mode.doValidation(doc));
         }
       });

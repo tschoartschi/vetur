@@ -77,6 +77,18 @@ export async function getJavascriptMode(
     }
   }
 
+  const formatHost: ts.FormatDiagnosticsHost = {
+    getCanonicalFileName(fileName: string) {
+      return fileName;
+    },
+    getCurrentDirectory() {
+      return workspacePath;
+    },
+    getNewLine() {
+      return '\n';
+    }
+  };
+
   const { updateCurrentVueTextDocument } = serviceHost;
   let config: any = {};
   let supportedCodeFixCodes: Set<number>;
@@ -132,6 +144,39 @@ export async function getJavascriptMode(
         };
       });
     },
+
+    doValidationForCli(doc: TextDocument): Diagnostic[] {
+      const { scriptDoc, service } = updateCurrentVueTextDocument(doc);
+      if (!languageServiceIncludesFile(service, doc.uri)) {
+        return [];
+      }
+
+      const fileFsPath = getFileFsPath(doc.uri);
+      const rawScriptDiagnostics = [
+        ...service.getSyntacticDiagnostics(fileFsPath),
+        ...service.getSemanticDiagnostics(fileFsPath)
+      ];
+
+      return rawScriptDiagnostics.map(diag => {
+        const tags: DiagnosticTag[] = [];
+
+        if (diag.reportsUnnecessary) {
+          tags.push(DiagnosticTag.Unnecessary);
+        }
+
+        // syntactic/semantic diagnostic always has start and length
+        // so we can safely cast diag to TextSpan
+        return <Diagnostic>{
+          range: convertRange(scriptDoc, diag as ts.TextSpan),
+          severity: DiagnosticSeverity.Error,
+          message: tsModule.formatDiagnosticsWithColorAndContext([diag], formatHost),
+          tags,
+          code: diag.code,
+          source: 'Vetur'
+        };
+      });
+    },
+
     doComplete(doc: TextDocument, position: Position): CompletionList {
       const { scriptDoc, service } = updateCurrentVueTextDocument(doc);
       if (!languageServiceIncludesFile(service, doc.uri)) {
